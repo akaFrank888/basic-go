@@ -6,7 +6,13 @@ func main() {
 
 	s := []string{"111", "222", "333"}
 	res, sResult := Delete[string](s, 1)
-	fmt.Printf("删除元素%v后，切片为：%v", res, sResult)
+	fmt.Printf("删除元素%v后，切片为：%v \n", res, sResult)
+	println("======")
+
+	ss := []float64{1, 2, 3, 4, 5}
+	val := 0.5
+	ssResult := Add(ss, 0, val)
+	fmt.Printf("添加元素%v后，切片为：%v", val, ssResult)
 
 }
 
