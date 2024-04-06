@@ -10,6 +10,8 @@
 1. 搭建自己的 <b>Go泛型工具库<b>
 <img src="images/week1_generic_kit.png">
 
+学习参考：https://github.com/ecodeclub/ekit/tree/dev/internal/slice
+
 ### Week 2 Gin、GORM入门与用户注册登录功能实现
 
 未完待续...
