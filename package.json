@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@types/antd": "^1.0.0",
+    "@types/moment": "^2.13.0",
+    "@types/next": "^9.0.0",
+    "@types/react-leaflet": "^3.0.0",
+    "@types/react-router-dom": "^5.3.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.74"
+  }
+}
