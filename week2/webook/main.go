@@ -1,17 +1,43 @@
 package main
 
 import (
+	"basic-go/week2/webook/internal/repository"
+	"basic-go/week2/webook/internal/repository/dao"
+	"basic-go/week2/webook/internal/service"
 	"basic-go/week2/webook/internal/web"
+	"basic-go/week2/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 	"strings"
 	"time"
 )
 
 func main() {
 
-	server := gin.Default()
+	// 连接mysql + 简表
+	db := initDB()
 
+	server := initServer()
+	initUser(db, server)
+	server.Run(":8080")
+
+}
+
+func initUser(db *gorm.DB, server *gin.Engine) {
+	// 从dao层依次创建
+	ud := dao.NewUserDao(db)
+	ur := repository.NewUserRepository(ud)
+	svc := service.NewUserService(ur)
+	c := web.NewUserHandler(svc)
+	c.RegisterRoutes(server)
+}
+
+func initServer() *gin.Engine {
+	server := gin.Default()
 	// middleware解决跨域问题【有跨域问题时才会触发】
 	server.Use(cors.New(cors.Config{
 		// 1. origin
@@ -34,14 +60,30 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}), func(ctx *gin.Context) { // TODO 因为是 HandlerFunc 类型的不定参数，所以可以传多个
-		println("第一个middleware")
-	}, func(ctx *gin.Context) {
-		println("第二个middleware")
+		println("这是一个middleware")
 	})
 
-	c := web.NewUserHandler()
-	c.RegisterRoutes(server)
+	loginMiddleWare := &middleware.LoginMiddlewareBuilder{}
+	// 创建cookie的存储方式
+	store := cookie.NewStore([]byte("secret"))
+	// 初始化一个session，命名为ssid，并以cookie存储ssid
+	server.Use(sessions.Sessions("ssid", store))
+	// 检查登录状态
+	server.Use(loginMiddleWare.CheckLogin())
+	return server
+}
 
-	server.Run(":8080")
-
+func initDB() *gorm.DB {
+	// gorm连接mysql
+	db, err := gorm.Open(mysql.Open("root:123456@tcp(localhost:13316)/webook"))
+	if err != nil {
+		// 服务器都出错就直接panic不用return啦
+		panic(err)
+	}
+	// 建表
+	err = dao.InitTables(db)
+	if err != nil {
+		panic(err)
+	}
+	return db
 }
