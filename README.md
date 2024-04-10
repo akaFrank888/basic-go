@@ -19,6 +19,13 @@
 学习内容：（Gin和Gorm）
 1. 完成了handler层中edit()和profile()的编写
 
+作业截图：【接口测试工具：Apifox】
+1. edit接口测试
+   <img src="images/week2_edit.png">
+
+2. profile接口测试
+   <img src="images/week2_profile.png">
+
 ### Week 3 Gin、GORM入门与用户注册登录功能实现
 
 待更。。。。
