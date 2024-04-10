@@ -5,6 +5,7 @@ import (
 	"basic-go/week2/webook/internal/repository"
 	"context"
 	"errors"
+	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -53,4 +54,12 @@ func (svc *UserService) Login(ctx context.Context, email string, password string
 
 	return u, nil
 
+}
+
+func (svc *UserService) UpdateNonSensitiveInfo(ctx context.Context, user domain.User) error {
+	return svc.repo.UpdateNonZeroFields(ctx, user)
+}
+
+func (svc *UserService) FindById(ctx *gin.Context, id int64) (domain.User, error) {
+	return svc.repo.FindById(ctx, id)
 }

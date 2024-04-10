@@ -7,11 +7,16 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"time"
 )
 
 const (
 	emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 	passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+	// 要求昵称长度在1到20个字符之间，禁止昵称为纯数字，禁止昵称为纯特殊符号或下划线
+	nicknameRegexPattern = `^(?=.{1,20}$)(?!^[0-9]*$)(?!^[\\W_]*$)[a-zA-Z0-9\u4e00-\u9fa5\\._-]+$`
+	birthdayRegexPattern = `^(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$`
+	resumeRegexPattern   = `^.{1,200}$`
 )
 
 // UserHandler 定义一个专门处理有关User的路由的Handler
@@ -20,6 +25,9 @@ type UserHandler struct {
 
 	emailRegexExp    *regexp.Regexp
 	passwordRegexExp *regexp.Regexp
+	nicknameRegexExp *regexp.Regexp
+	birthdayRegexExp *regexp.Regexp
+	resumeRegexExp   *regexp.Regexp
 }
 
 func NewUserHandler(svc *service.UserService) *UserHandler {
@@ -28,6 +36,9 @@ func NewUserHandler(svc *service.UserService) *UserHandler {
 		// 预编译正则表达式提升性能
 		emailRegexExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRegexExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
+		nicknameRegexExp: regexp.MustCompile(nicknameRegexPattern, regexp.None),
+		birthdayRegexExp: regexp.MustCompile(birthdayRegexPattern, regexp.None),
+		resumeRegexExp:   regexp.MustCompile(resumeRegexPattern, regexp.None),
 	}
 }
 
@@ -64,9 +75,7 @@ func (c *UserHandler) SignUp(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "两次输入密码错误")
 		return
 	}
-
 	isEmail, err := c.emailRegexExp.MatchString(req.Email)
-
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误（正则Pattern错误）")
 		return
@@ -76,7 +85,6 @@ func (c *UserHandler) SignUp(ctx *gin.Context) {
 		return
 	}
 	isPassword, err := c.passwordRegexExp.MatchString(req.Password)
-
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误（正则Pattern错误）")
 		return
@@ -116,7 +124,6 @@ func (c *UserHandler) Login(ctx *gin.Context) {
 	}
 
 	u, err := c.svc.Login(ctx, req.Email, req.Password)
-
 	switch err {
 	case nil:
 		// 登录成功后获取session，存入域对象u的id，便于profile和edit方法获取
@@ -140,15 +147,107 @@ func (c *UserHandler) Login(ctx *gin.Context) {
 }
 
 func (c *UserHandler) Edit(ctx *gin.Context) {
-	var profile domain.Profile
-	if err := ctx.Bind(&profile); err != nil {
-
+	type Req struct {
+		Nickname string `json:"nickname"`
+		Birthday string `json:"birthday"`
+		Resume   string `json:"resume"`
 	}
-	ctx.String(http.StatusOK, "Edit的响应")
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	// 对昵称、生日和个人简介进行正则规范
+	isNickname, err := c.nicknameRegexExp.MatchString(req.Nickname)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误（nickname的regex错误）")
+		return
+	}
+	if !isNickname {
+		ctx.String(http.StatusOK, "昵称不合法")
+		return
+	}
+	isBirthday, err := c.birthdayRegexExp.MatchString(req.Birthday)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误（birthday的regex错误）")
+		return
+	}
+	if !isBirthday {
+		ctx.String(http.StatusOK, "生日格式不合法")
+		return
+	}
+	isResume, err := c.resumeRegexExp.MatchString(req.Resume)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误（resume的regex错误）")
+		return
+	}
+	if !isResume {
+		ctx.String(http.StatusOK, "个人简介不合法")
+		return
+	}
+
+	// 从session中取出userId【因为sess.get返回的interface类型，所以用类型断言认定为int64类型的值】
+	// TODO 可以用 jwt？
+	sess := sessions.Default(ctx)
+	var userId int64
+	if val, ok := sess.Get("userId").(int64); ok {
+		userId = val
+	} else {
+		panic("userId的session的值不是int64")
+	}
+
+	// 除了用regex校验生日，还可以调用time.Parse方法【但返回的是time类型】
+	birthday, err := time.Parse(time.DateOnly, req.Birthday)
+	if err != nil {
+		ctx.String(http.StatusOK, "生日格式不合法")
+		return
+	}
+
+	// 在web层调用service()，要用domain往下传
+	err = c.svc.UpdateNonSensitiveInfo(ctx, domain.User{
+		Id:       userId,
+		Nickname: req.Nickname,
+		Birthday: birthday,
+		Resume:   req.Resume,
+	})
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误（web层的edit）")
+		return
+	}
+
+	ctx.String(http.StatusOK, "更新成功（Edit）")
 
 }
 
 func (c *UserHandler) Profile(ctx *gin.Context) {
-	ctx.String(http.StatusOK, "Profile的响应")
+
+	sess := sessions.Default(ctx)
+	var userId int64
+	if val, ok := sess.Get("userId").(int64); ok {
+		userId = val
+	} else {
+		panic("userId的session的值不是int64")
+	}
+
+	var u domain.User
+	u, err := c.svc.FindById(ctx, userId)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误（web层的profile）")
+	}
+
+	// 不能将domain.user直接传给前端，从中挑出nickname、Email、birthday和resume
+	type User struct {
+		Nickname string `json:"nickname"`
+		Email    string `json:"email"`
+		Birthday string `json:"birthday"`
+		Resume   string `json:"resume"`
+	}
+
+	ctx.JSON(http.StatusOK, User{
+		Nickname: u.Nickname,
+		Email:    u.Email,
+		Birthday: u.Birthday.Format(time.DateOnly),
+		Resume:   u.Resume,
+	})
 
 }

@@ -3,6 +3,7 @@ package dao
 import (
 	"context"
 	"errors"
+	"github.com/gin-gonic/gin"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"time"
@@ -52,10 +53,30 @@ func (dao *UserDao) FindByEmail(ctx context.Context, email string) (User, error)
 	return u, err
 }
 
+func (dao *UserDao) UpdateById(ctx context.Context, persistent User) error {
+	return dao.db.WithContext(ctx).Model(&persistent).Where("id=?", persistent.Id).Updates(map[string]any{
+		"utime":    time.Now().UnixMilli(), // 更新时间
+		"nickname": persistent.Nickname,
+		"birthday": persistent.Birthday,
+		"resume":   persistent.Resume,
+	}).Error
+}
+
+func (dao *UserDao) FindById(ctx *gin.Context, id int64) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("id=?", id).First(&u).Error
+	return u, err
+}
+
+// User 相当于PO，即属性与表字段一一对应
 type User struct {
 	Id       int64  `gorm:"primaryKey,autoIncrement"`
 	Email    string `gorm:"unique"`
 	Password string
+	Nickname string `gorm:"type=varchar(20)"`
+	Birthday int64
+	Resume   string `gorm:"type=varchar(200)"`
+
 	// 创建时间  避免时区问题，一律用 UTC 0 的毫秒数【若要转成符合中国的时区，要么让前端处理，要么在web层给前端的时候转成UTC 8 的时区】
 	Ctime int64
 	// 更新时间
