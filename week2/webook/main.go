@@ -8,7 +8,7 @@ import (
 	"basic-go/week2/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -64,9 +64,18 @@ func initServer() *gin.Engine {
 	})
 
 	loginMiddleWare := &middleware.LoginMiddlewareBuilder{}
-	// 创建cookie的存储方式
-	store := cookie.NewStore([]byte("secret"))
+	// 方式一：创建cookie的存储方式
+	// store := cookie.NewStore([]byte("secret"))
+	// 方式二：基于内存的实现，第一个参数是 authentication key 32位或64位无特殊字符；第二个参数是 encryption key
+	// store := memstore.NewStore([]byte("IKD20XkWAXJus2zS7R97SH51K7XgQrLb"),
+	// 	[]byte("TYJ5tKRWpIfBYWBPLMK9bGxKLAgkpXXN"))
+	// 方式三：
 	// 初始化一个session，命名为ssid，并以cookie存储ssid
+	store, err := redis.NewStore(16, "tcp", "localhost:6379",
+		"", []byte("IKD20XkWAXJus2zS7R97SH51K7XgQrLb"), []byte("IKD20XkWAXJus2zS7R97SH51K7XgQrLa"))
+	if err != nil {
+		panic(err)
+	}
 	server.Use(sessions.Sessions("ssid", store))
 	// 检查登录状态
 	server.Use(loginMiddleWare.CheckLogin())

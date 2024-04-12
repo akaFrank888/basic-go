@@ -18,6 +18,7 @@
 
 学习内容：（Gin和Gorm）
 1. 完成了handler层中edit()和profile()的编写
+2. 基于cookie的实现保存session数据
 
 作业截图：【接口测试工具：Apifox】
 1. edit接口测试

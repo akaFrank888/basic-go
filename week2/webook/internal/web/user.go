@@ -50,7 +50,7 @@ func (c *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/signup", c.SignUp) // TODO 注意此处HandlerFunc类型，不需要写SignUp后的括号及参数
 	ug.POST("/login", c.Login)
 	ug.POST("/edit", c.Edit)
-	ug.POST("/profile", c.Profile)
+	ug.GET("/profile", c.Profile)
 
 }
 
@@ -141,6 +141,7 @@ func (c *UserHandler) Login(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "登录成功")
 	case service.ErrInvalidUserOrPassword:
 		ctx.String(http.StatusOK, "账号或密码错误")
+		return
 	default:
 		ctx.String(http.StatusOK, "系统错误（web层的Login）")
 	}

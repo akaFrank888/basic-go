@@ -13,4 +13,10 @@ services:
     ports:
       #      - 外部访问用 13316
       - 13316:3306
-
+  redis:
+    image: "bitnami/redis:latest"
+    restart: always
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - '6379:6379'
