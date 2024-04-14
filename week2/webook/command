@@ -1,0 +1,13 @@
+#把上次编译的东西删掉
+rm webook
+
+#运行一下 go mod tidy，防止 go.sum文件不对，编译失败
+go mod tidy
+
+ # 指定编译成在ARM 架构的linux操作系统上运行的可执行文件，名字叫做web9ok
+$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o webook .
+
+docker rmi -f flycash/webook:v0.0.1
+
+ #这里你可以随便改这个标签，记得对应的k8s 部署里面也要改
+docker build -t flycash/webook:v0.0.1 .
