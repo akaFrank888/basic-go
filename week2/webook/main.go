@@ -6,10 +6,10 @@ import (
 	"basic-go/week2/webook/internal/service"
 	"basic-go/week2/webook/internal/web"
 	"basic-go/week2/webook/internal/web/middleware"
+	"basic-go/week2/webook/pkg/ginx/middleware/ratelimit"
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"strings"
@@ -50,12 +50,13 @@ func initServer() *gin.Engine {
 			}
 			return strings.Contains(origin, "your_company.com") // 只有公司的域名可以跨域访问
 		},
-
 		// 2. method（不写就是默许全部方法）
 		//AllowMethods:     []string{"PUT", "POST"},
 		// 3. headers
-		AllowHeaders: []string{"content-type"},
-		//ExposeHeaders: []string{"Content-Length"},
+		// 前端要把token放在authorization里面
+		AllowHeaders: []string{"content-type", "authorization"},
+		// 允许前端访问到你的后端响应中带的header【跨域问题类型】【加几个header就要在这允许几个】
+		ExposeHeaders: []string{"x-jwt-token"},
 		// 4. 是否允许cookie
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -63,7 +64,25 @@ func initServer() *gin.Engine {
 		println("这是一个middleware")
 	})
 
-	loginMiddleWare := &middleware.LoginMiddlewareBuilder{}
+	// 基于redis的限流
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	server.Use(ratelimit.NewBuilder(redisClient,
+		time.Second, 1).Build())
+
+	// userSession(server)
+	userJWT(server)
+
+	return server
+}
+
+func userJWT(server *gin.Engine) {
+	login := middleware.LoginJWTMiddlewareBuilder{}
+	server.Use(login.CheckLoginJWT())
+}
+
+func userSession(server *gin.Engine) {
 	// 方式一：创建cookie的存储方式
 	// store := cookie.NewStore([]byte("secret"))
 	// 方式二：基于内存的实现，第一个参数是 authentication key 32位或64位无特殊字符；第二个参数是 encryption key
@@ -71,15 +90,16 @@ func initServer() *gin.Engine {
 	// 	[]byte("TYJ5tKRWpIfBYWBPLMK9bGxKLAgkpXXN"))
 	// 方式三：
 	// 初始化一个session，命名为ssid，并以cookie存储ssid
-	store, err := redis.NewStore(16, "tcp", "localhost:6379",
-		"", []byte("IKD20XkWAXJus2zS7R97SH51K7XgQrLb"), []byte("IKD20XkWAXJus2zS7R97SH51K7XgQrLa"))
-	if err != nil {
-		panic(err)
-	}
-	server.Use(sessions.Sessions("ssid", store))
-	// 检查登录状态
-	server.Use(loginMiddleWare.CheckLogin())
-	return server
+
+	//loginMiddleWare := &middleware.LoginMiddlewareBuilder{}
+	//store, err := redis.NewStore(16, "tcp", "localhost:6379",
+	//	"", []byte("IKD20XkWAXJus2zS7R97SH51K7XgQrLb"), []byte("IKD20XkWAXJus2zS7R97SH51K7XgQrLa"))
+	//if err != nil {
+	//	panic(err)
+	//}
+	//server.Use(sessions.Sessions("ssid", store))
+	//// 检查登录状态
+	//server.Use(loginMiddleWare.CheckLogin())
 }
 
 func initDB() *gorm.DB {

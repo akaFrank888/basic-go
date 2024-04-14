@@ -6,6 +6,7 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"time"
 )
@@ -48,7 +49,8 @@ func (c *UserHandler) RegisterRoutes(server *gin.Engine) {
 	// 使用Group分组路由，简化注册路由中的路径长度
 	ug := server.Group("/users")
 	ug.POST("/signup", c.SignUp) // TODO 注意此处HandlerFunc类型，不需要写SignUp后的括号及参数
-	ug.POST("/login", c.Login)
+	// ug.POST("/login", c.Login)
+	ug.POST("/login", c.LoginJWT)
 	ug.POST("/edit", c.Edit)
 	ug.GET("/profile", c.Profile)
 
@@ -147,6 +149,43 @@ func (c *UserHandler) Login(ctx *gin.Context) {
 	}
 }
 
+func (c *UserHandler) LoginJWT(ctx *gin.Context) {
+	type Req struct {
+		// 邮箱和密码
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	u, err := c.svc.Login(ctx, req.Email, req.Password)
+	switch err {
+	case nil:
+		uc := UserClaims{
+			Uid:       u.Id,
+			UserAgent: ctx.GetHeader("User-Agent"),
+			RegisteredClaims: jwt.RegisteredClaims{
+				// JWT设置为1min过期
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+			},
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
+		tokenStr, err := token.SignedString(JWTKey)
+		if err != nil {
+			ctx.String(http.StatusOK, "系统错误（JWT）")
+		}
+		ctx.Header("x-jwt-token", tokenStr)
+		ctx.String(http.StatusOK, "登录成功")
+	case service.ErrInvalidUserOrPassword:
+		ctx.String(http.StatusOK, "账号或密码错误")
+		return
+	default:
+		ctx.String(http.StatusOK, "系统错误（web层的Login）")
+	}
+}
+
 func (c *UserHandler) Edit(ctx *gin.Context) {
 	type Req struct {
 		Nickname string `json:"nickname"`
@@ -222,16 +261,19 @@ func (c *UserHandler) Edit(ctx *gin.Context) {
 
 func (c *UserHandler) Profile(ctx *gin.Context) {
 
-	sess := sessions.Default(ctx)
-	var userId int64
-	if val, ok := sess.Get("userId").(int64); ok {
-		userId = val
-	} else {
-		panic("userId的session的值不是int64")
-	}
+	// 方式一：从session中取出uid
+	//sess := sessions.Default(ctx)
+	//var userId int64
+	//if val, ok := sess.Get("userId").(int64); ok {
+	//	userId = val
+	//} else {
+	//	panic("userId的session的值不是int64")
+	//}
 
-	var u domain.User
-	u, err := c.svc.FindById(ctx, userId)
+	// 方式二：从uc中取
+	uc := ctx.MustGet("user").(UserClaims)
+	u, err := c.svc.FindById(ctx, uc.Uid)
+
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误（web层的profile）")
 	}
@@ -252,3 +294,11 @@ func (c *UserHandler) Profile(ctx *gin.Context) {
 	})
 
 }
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	Uid       int64
+	UserAgent string
+}
+
+var JWTKey = []byte("IKD20XkWAXJus2zS7R97SH51K7XgQrLb")
