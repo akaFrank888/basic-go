@@ -2,6 +2,7 @@ package main
 
 import (
 	"basic-go/week2/webook/internal/repository"
+	"basic-go/week2/webook/internal/repository/cache"
 	"basic-go/week2/webook/internal/repository/dao"
 	"basic-go/week2/webook/internal/service"
 	"basic-go/week2/webook/internal/web"
@@ -12,23 +13,18 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"net/http"
 	"strings"
 	"time"
 )
 
 func main() {
 
-	// 连接mysql + 简表
-	//db := initDB()
-	//
-	//server := initServer()
-	//initUser(db, server)
+	// 连接mysql + 建表
+	db := initDB()
 
-	server := gin.Default()
-	server.GET("/hello", func(ctx *gin.Context) {
-		ctx.String(http.StatusOK, "hello world")
-	})
+	server := initServer()
+	initUser(db, server)
+
 	server.Run(":8080")
 
 }
@@ -36,6 +32,7 @@ func main() {
 func initUser(db *gorm.DB, server *gin.Engine) {
 	// 从dao层依次创建
 	ud := dao.NewUserDao(db)
+	cache.NewUserCache()
 	ur := repository.NewUserRepository(ud)
 	svc := service.NewUserService(ur)
 	c := web.NewUserHandler(svc)

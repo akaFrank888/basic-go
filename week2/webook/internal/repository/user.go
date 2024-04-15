@@ -2,6 +2,7 @@ package repository
 
 import (
 	"basic-go/week2/webook/internal/domain"
+	"basic-go/week2/webook/internal/repository/cache"
 	"basic-go/week2/webook/internal/repository/dao"
 	"context"
 	"github.com/gin-gonic/gin"
@@ -16,7 +17,8 @@ var (
 )
 
 type UserRepository struct {
-	dao *dao.UserDao
+	dao   *dao.UserDao
+	cache *cache.UserCache
 }
 
 //func (repo *UserRepository) Create(ctx context.Context, u domain.User) error {
@@ -26,9 +28,10 @@ type UserRepository struct {
 //	})
 //}
 
-func NewUserRepository(dao *dao.UserDao) *UserRepository {
+func NewUserRepository(d *dao.UserDao, c *cache.UserCache) *UserRepository {
 	return &UserRepository{
-		dao: dao,
+		dao:   d,
+		cache: c,
 	}
 }
 
@@ -48,9 +51,22 @@ func (repo *UserRepository) UpdateNonZeroFields(ctx context.Context, user domain
 	return repo.dao.UpdateById(ctx, toPersistent(user))
 }
 
-func (repo *UserRepository) FindById(ctx *gin.Context, id int64) (domain.User, error) {
-	u, err := repo.dao.FindById(ctx, id)
-	return toDomain(u), err
+func (repo *UserRepository) FindById(ctx *gin.Context, uid int64) (domain.User, error) {
+	du, err := repo.cache.Get(ctx, uid)
+	if err == nil {
+		// 从缓存中查到了
+		return du, nil
+	}
+
+	// TODO err不为nil有多种可能：
+	// 1） 缓存中没有key，但redis正常
+	// 2） 访问redis有问题。可能是连不上网，也可能redis本身崩了
+	u, err := repo.dao.FindById(ctx, uid)
+	// 将du存入缓存
+	du = toDomain(u)
+	_ = repo.cache.Set(ctx, du)
+	// TODO 可以不接收err，因为这次没存进缓存，下次直接查数据库就行了。而且接受了err，也只说明连接redis的网络和本身有问题，无法解决。
+	return du, nil
 }
 
 // 私有方法（首字母小写）
