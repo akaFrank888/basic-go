@@ -17,8 +17,11 @@ func (m *LoginJWTMiddlewareBuilder) CheckLoginJWT() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// 登录校验
 		path := ctx.Request.URL.Path
-		if path == "/users/signup" || path == "/users/login" {
-			// 这两个页面不需要校验是否登录
+		if path == "/users/signup" ||
+			path == "/users/login" ||
+			path == "/users/login_sms/code/send" ||
+			path == "/users/login_sms" {
+			// 不需要校验是否登录
 			return
 		}
 

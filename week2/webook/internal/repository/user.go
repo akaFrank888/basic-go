@@ -5,14 +5,15 @@ import (
 	"basic-go/week2/webook/internal/repository/cache"
 	"basic-go/week2/webook/internal/repository/dao"
 	"context"
-	"github.com/gin-gonic/gin"
+	"database/sql"
 	"time"
 )
 
 // ErrDuplicateEmail 小技巧：如果dao层返回了这个err，则service层可直接从repo层调用来进行判定
 var (
 	ErrDuplicateEmail = dao.ErrDuplicateEmail
-	// 得重新命名为 User 相关的，因为Service在通过repo层调用时是在具体业务中的（如User业务，而不能用Record）
+	ErrDuplicatePhone = dao.ErrDuplicatePhone
+	// ErrUserNotFound 得重新命名为 User 相关的，因为Service在通过repo层调用时是在具体业务中的（如User业务，而不能用Record）
 	ErrUserNotFound = dao.ErrRecordNotFound
 )
 
@@ -51,7 +52,7 @@ func (repo *UserRepository) UpdateNonZeroFields(ctx context.Context, user domain
 	return repo.dao.UpdateById(ctx, toPersistent(user))
 }
 
-func (repo *UserRepository) FindById(ctx *gin.Context, uid int64) (domain.User, error) {
+func (repo *UserRepository) FindById(ctx context.Context, uid int64) (domain.User, error) {
 	du, err := repo.cache.Get(ctx, uid)
 	if err == nil {
 		// 从缓存中查到了
@@ -69,11 +70,21 @@ func (repo *UserRepository) FindById(ctx *gin.Context, uid int64) (domain.User, 
 	return du, nil
 }
 
+func (repo *UserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
+	u, err := repo.dao.FindByPhone(ctx, phone)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return toDomain(u), nil
+
+}
+
 // 私有方法（首字母小写）
 func toDomain(u dao.User) domain.User {
 	return domain.User{
 		Id:       u.Id,
-		Email:    u.Email,
+		Email:    u.Email.String,
+		Phone:    u.Phone.String,
 		Password: u.Password,
 		Nickname: u.Nickname,
 		// UTC 0的毫秒 -> time
@@ -86,8 +97,15 @@ func toDomain(u dao.User) domain.User {
 
 func toPersistent(u domain.User) dao.User {
 	return dao.User{
-		Id:       u.Id,
-		Email:    u.Email,
+		Id: u.Id,
+		Email: sql.NullString{
+			String: u.Email,
+			Valid:  u.Email != "",
+		},
+		Phone: sql.NullString{
+			String: u.Phone,
+			Valid:  u.Phone != "",
+		},
 		Password: u.Password,
 		Nickname: u.Nickname,
 		Birthday: u.Birthday.UnixMilli(),

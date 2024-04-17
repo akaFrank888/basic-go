@@ -1,5 +1,13 @@
 ## Golang学习（ready for 2026校招）
 
+启动：
+
+1） docker compose：在webook目录下，执行`docker compose up`
+
+2） 后端
+
+ 3）前端启动： 在webook-fe目录下，执行`npm install`，等下载好接着执行`npm run dev`
+
 ### Week 1 Go基础语法
 学习时间： 2024/4/3 —— 2024/4/6
 

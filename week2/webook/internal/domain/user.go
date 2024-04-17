@@ -12,5 +12,7 @@ type User struct {
 	Birthday time.Time
 	Resume   string
 
+	Phone string
+
 	Ctime time.Time
 }

@@ -1,13 +1,15 @@
 package main
 
 import (
+	"basic-go/week2/webook/config"
 	"basic-go/week2/webook/internal/repository"
 	"basic-go/week2/webook/internal/repository/cache"
 	"basic-go/week2/webook/internal/repository/dao"
 	"basic-go/week2/webook/internal/service"
+	"basic-go/week2/webook/internal/service/sms"
+	"basic-go/week2/webook/internal/service/sms/localsms"
 	"basic-go/week2/webook/internal/web"
 	"basic-go/week2/webook/internal/web/middleware"
-	"basic-go/week2/webook/pkg/ginx/middleware/ratelimit"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -22,21 +24,34 @@ func main() {
 	// 连接mysql + 建表
 	db := initDB()
 
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: config.Config.Redis.Addr,
+	})
 	server := initServer()
-	initUser(db, server)
+	codeSvc := initCodeSvc(redisClient)
+	initUser(db, server, redisClient, codeSvc)
 
 	server.Run(":8080")
 
 }
 
-func initUser(db *gorm.DB, server *gin.Engine) {
+func initUser(db *gorm.DB, server *gin.Engine, redisClient redis.Cmdable, codeSvc *service.CodeService) {
 	// 从dao层依次创建
 	ud := dao.NewUserDao(db)
-	cache.NewUserCache()
-	ur := repository.NewUserRepository(ud)
+	uc := cache.NewUserCache(redisClient)
+	ur := repository.NewUserRepository(ud, uc)
 	svc := service.NewUserService(ur)
-	c := web.NewUserHandler(svc)
+	c := web.NewUserHandler(svc, codeSvc)
 	c.RegisterRoutes(server)
+}
+
+func initCodeSvc(redisClient redis.Cmdable) *service.CodeService {
+	cc := cache.NewCodeCache(redisClient)
+	crepo := repository.NewCodeRepository(cc)
+	return service.NewCodeService(crepo, initMemorySms())
+}
+func initMemorySms() sms.Service {
+	return localsms.NewService()
 }
 
 func initServer() *gin.Engine {
@@ -67,12 +82,12 @@ func initServer() *gin.Engine {
 		println("这是一个middleware")
 	})
 
-	// 基于redis的限流
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-	server.Use(ratelimit.NewBuilder(redisClient,
-		time.Second, 1).Build())
+	//// 基于redis的限流
+	//redisClient := redis.NewClient(&redis.Options{
+	//	Addr: config.Config.Redis.Addr,
+	//})
+	//server.Use(ratelimit.NewBuilder(redisClient,
+	//	time.Second, 1).Build())
 
 	// userSession(server)
 	userJWT(server)

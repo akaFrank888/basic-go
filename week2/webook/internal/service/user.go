@@ -5,7 +5,6 @@ import (
 	"basic-go/week2/webook/internal/repository"
 	"context"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -60,6 +59,29 @@ func (svc *UserService) UpdateNonSensitiveInfo(ctx context.Context, user domain.
 	return svc.repo.UpdateNonZeroFields(ctx, user)
 }
 
-func (svc *UserService) FindById(ctx *gin.Context, id int64) (domain.User, error) {
+func (svc *UserService) FindById(ctx context.Context, id int64) (domain.User, error) {
 	return svc.repo.FindById(ctx, id)
+}
+
+func (svc *UserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+	u, err := svc.repo.FindByPhone(ctx, phone)
+	if err != repository.ErrUserNotFound {
+		// 两种情况
+		// 1. err != nil ==> 系统错误
+		// 2. err == nil ==> u可用
+		return u, err
+	}
+	// Find失败就Create
+	err = svc.repo.Create(ctx, domain.User{
+		Phone: phone,
+	})
+	if err != nil && err != repository.ErrDuplicatePhone {
+		// 系统错误
+		return domain.User{}, err
+	}
+	// 两种情况
+	// 1. err == ErrDuplicatePhone ==> 手机号冲突
+	// 2. err == nil ==> 创建成功
+	// TODO 主从延迟 ==>插入进的是主库，查询查的是从库，所以可能刚插进去就查的话查不到，因为主从库还没同步完成【解决方式是强制查主库，但还没做】
+	return svc.repo.FindByPhone(ctx, phone)
 }

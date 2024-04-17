@@ -2,8 +2,8 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"time"
@@ -12,6 +12,7 @@ import (
 // ErrDuplicateEmail 预自定义一个错误
 var (
 	ErrDuplicateEmail = errors.New("邮箱冲突")
+	ErrDuplicatePhone = errors.New("手机号冲突")
 	// ErrRecordNotFound gorm框架有 未找到某条数据 得错误
 	ErrRecordNotFound = gorm.ErrRecordNotFound
 )
@@ -62,20 +63,29 @@ func (dao *UserDao) UpdateById(ctx context.Context, persistent User) error {
 	}).Error
 }
 
-func (dao *UserDao) FindById(ctx *gin.Context, id int64) (User, error) {
+func (dao *UserDao) FindById(ctx context.Context, id int64) (User, error) {
 	var u User
 	err := dao.db.WithContext(ctx).Where("id=?", id).First(&u).Error
 	return u, err
 }
 
+func (dao *UserDao) FindByPhone(ctx context.Context, phone string) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("phone=?", phone).First(&u).Error
+	return u, err
+}
+
 // User 相当于PO，即属性与表字段一一对应
 type User struct {
-	Id       int64  `gorm:"primaryKey,autoIncrement"`
-	Email    string `gorm:"unique"`
+	Id int64 `gorm:"primaryKey,autoIncrement"`
+	// 代表可为Null（因为用户用phone注册的话，会没有email）
+	Email    sql.NullString `gorm:"unique"`
 	Password string
 	Nickname string `gorm:"type=varchar(20)"`
 	Birthday int64
 	Resume   string `gorm:"type=varchar(200)"`
+
+	Phone sql.NullString `gorm:"unique"`
 
 	// 创建时间  避免时区问题，一律用 UTC 0 的毫秒数【若要转成符合中国的时区，要么让前端处理，要么在web层给前端的时候转成UTC 8 的时区】
 	Ctime int64

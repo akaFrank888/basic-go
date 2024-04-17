@@ -2,9 +2,9 @@ package cache
 
 import (
 	"basic-go/week2/webook/internal/domain"
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"time"
 )
@@ -14,7 +14,7 @@ type UserCache struct {
 	expiration time.Duration
 }
 
-func (c *UserCache) Get(ctx *gin.Context, uid int64) (domain.User, error) {
+func (c *UserCache) Get(ctx context.Context, uid int64) (domain.User, error) {
 	key := c.Key(uid)
 	// 假定用JSON来存储val
 	val, err := c.cmd.Get(ctx, key).Result()
@@ -32,7 +32,7 @@ func (c *UserCache) Key(uid int64) string {
 	return fmt.Sprintf("user:info:%d", uid)
 }
 
-func (c *UserCache) Set(ctx *gin.Context, du domain.User) error {
+func (c *UserCache) Set(ctx context.Context, du domain.User) error {
 	key := c.Key(du.Id)
 	// 序列化
 	val, err := json.Marshal(du)

@@ -18,11 +18,14 @@ const (
 	nicknameRegexPattern = `^(?=.{1,20}$)(?!^[0-9]*$)(?!^[\\W_]*$)[a-zA-Z0-9\u4e00-\u9fa5\\._-]+$`
 	birthdayRegexPattern = `^(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$`
 	resumeRegexPattern   = `^.{1,200}$`
+
+	bizLogin = "login"
 )
 
 // UserHandler 定义一个专门处理有关User的路由的Handler
 type UserHandler struct {
-	svc *service.UserService
+	svc     *service.UserService
+	codeSvc *service.CodeService
 
 	emailRegexExp    *regexp.Regexp
 	passwordRegexExp *regexp.Regexp
@@ -31,9 +34,11 @@ type UserHandler struct {
 	resumeRegexExp   *regexp.Regexp
 }
 
-func NewUserHandler(svc *service.UserService) *UserHandler {
+func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
 	return &UserHandler{
-		svc: svc,
+		svc:     svc,
+		codeSvc: codeSvc,
+
 		// 预编译正则表达式提升性能
 		emailRegexExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRegexExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
@@ -53,6 +58,84 @@ func (c *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login", c.LoginJWT)
 	ug.POST("/edit", c.Edit)
 	ug.GET("/profile", c.Profile)
+	ug.POST("/login_sms/code/send", c.SendSMSLog)
+	ug.POST("/login_sms", c.LoginSMS)
+}
+
+func (c *UserHandler) SendSMSLog(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	// 校验req
+	if req.Phone == "" {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "请输入手机号码",
+		})
+		return
+	}
+
+	// 调用service层的发送验证码
+	err := c.codeSvc.Send(ctx, bizLogin, req.Phone)
+	switch err {
+	case nil:
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "发送成功",
+		})
+	case service.ErrCodeSendTooMany:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "短信发送太频繁，稍后再试",
+		})
+	default:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "发送失败",
+		})
+	}
+}
+func (c *UserHandler) LoginSMS(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	ok, err := c.codeSvc.Verify(ctx, bizLogin, req.Phone, req.Code)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "验证码错误",
+		})
+		return
+	}
+	// 验证码正确，调用service层进行登录
+	// 因为用户可能未用手机号注册，所以需要调用FindOrCreate方法
+	u, err := c.svc.FindOrCreate(ctx, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	c.setJWTToken(ctx, u.Id)
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "登录成功",
+	})
 
 }
 
@@ -163,20 +246,7 @@ func (c *UserHandler) LoginJWT(ctx *gin.Context) {
 	u, err := c.svc.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
-		uc := UserClaims{
-			Uid:       u.Id,
-			UserAgent: ctx.GetHeader("User-Agent"),
-			RegisteredClaims: jwt.RegisteredClaims{
-				// JWT设置为1min过期
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
-			},
-		}
-		token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
-		tokenStr, err := token.SignedString(JWTKey)
-		if err != nil {
-			ctx.String(http.StatusOK, "系统错误（JWT）")
-		}
-		ctx.Header("x-jwt-token", tokenStr)
+		c.setJWTToken(ctx, u.Id)
 		ctx.String(http.StatusOK, "登录成功")
 	case service.ErrInvalidUserOrPassword:
 		ctx.String(http.StatusOK, "账号或密码错误")
@@ -184,6 +254,23 @@ func (c *UserHandler) LoginJWT(ctx *gin.Context) {
 	default:
 		ctx.String(http.StatusOK, "系统错误（web层的Login）")
 	}
+}
+
+func (c *UserHandler) setJWTToken(ctx *gin.Context, uid int64) {
+	uc := UserClaims{
+		Uid:       uid,
+		UserAgent: ctx.GetHeader("User-Agent"),
+		RegisteredClaims: jwt.RegisteredClaims{
+			// JWT设置为1min过期
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
+	tokenStr, err := token.SignedString(JWTKey)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误（JWT）")
+	}
+	ctx.Header("x-jwt-token", tokenStr)
 }
 
 func (c *UserHandler) Edit(ctx *gin.Context) {
