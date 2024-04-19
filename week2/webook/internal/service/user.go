@@ -14,17 +14,24 @@ var (
 	ErrInvalidUserOrPassword = errors.New("账号或密码错误")
 )
 
-type UserService struct {
-	repo *repository.UserRepository
+type UserService interface {
+	Login(ctx context.Context, email string, password string) (domain.User, error)
+	SignUp(ctx context.Context, u domain.User) error
+	UpdateNonSensitiveInfo(ctx context.Context, user domain.User) error
+	FindById(ctx context.Context, id int64) (domain.User, error)
+	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
+}
+type userService struct {
+	repo repository.UserRepository
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
-	return &UserService{
+func NewUserService(repo repository.UserRepository) UserService {
+	return &userService{
 		repo: repo,
 	}
 }
 
-func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
+func (svc *userService) SignUp(ctx context.Context, u domain.User) error {
 	// 对用户密码的加密设计在service层
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 
@@ -36,7 +43,7 @@ func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
 }
 
 // Login 因为session，所以要返回一个domain.User
-func (svc *UserService) Login(ctx context.Context, email string, password string) (domain.User, error) {
+func (svc *userService) Login(ctx context.Context, email string, password string) (domain.User, error) {
 	u, err := svc.repo.FindByEmail(ctx, email)
 	if err == repository.ErrUserNotFound {
 		return domain.User{}, ErrInvalidUserOrPassword
@@ -55,15 +62,15 @@ func (svc *UserService) Login(ctx context.Context, email string, password string
 
 }
 
-func (svc *UserService) UpdateNonSensitiveInfo(ctx context.Context, user domain.User) error {
+func (svc *userService) UpdateNonSensitiveInfo(ctx context.Context, user domain.User) error {
 	return svc.repo.UpdateNonZeroFields(ctx, user)
 }
 
-func (svc *UserService) FindById(ctx context.Context, id int64) (domain.User, error) {
+func (svc *userService) FindById(ctx context.Context, id int64) (domain.User, error) {
 	return svc.repo.FindById(ctx, id)
 }
 
-func (svc *UserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+func (svc *userService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
 	u, err := svc.repo.FindByPhone(ctx, phone)
 	if err != repository.ErrUserNotFound {
 		// 两种情况

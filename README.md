@@ -47,18 +47,20 @@
 1. 如图
    <img src="images/week3_content.png">
 
-2. 跳过了“用k8s部署web、mysql和redis”，进度在“k8s部署web服务器”视频的29:33处。
+2. <font color='brown'>跳过了“用k8s部署web、mysql和redis”，进度在“k8s部署web服务器”视频的29:33处。</font>
 【跳过原因：1. k8s命令琐碎，跳过不影响后续课程 2. 面试时重点在回答概念，且入职后确保自己在公司接触到k8s的时候，能够看懂公司的k8s部署配置就行】
 
 <img src="images/week3_content_k8s.png">
 
 ### Week 4 接口抽象技巧和短信服务
 
-学习时间： 2024/4/15 —— 2024/4/
+学习时间： 2024/4/15 —— 2024/4/19
 
 学习内容：
 1. 上图的“压测与缓存机制”
 2. 短信服务实现
    <img src="images/week4_message.png">
+3. <font color='brown'>第4周作业未提交 【涉及到普通锁】</font>
+4. 用wire改造代码（依赖注入） + 面向接口编程
 
 待更。。。。

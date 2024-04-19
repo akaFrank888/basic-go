@@ -2,21 +2,44 @@ package tencent
 
 // 引入sms
 import (
+	"basic-go/week2/webook/internal/service/sms"
 	"context"
 	"fmt"
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
-	sms "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111" // 引入sms
+	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"
+	tencentSMS "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111" // 引入sms
+	"os"
 )
 
 type Service struct {
-	client *sms.Client
+	client *tencentSMS.Client
 	// 腾讯云的短信SDK设计的就是string的指针
 	appId    *string
 	signName *string
 }
 
+func NewTencentSMSService() sms.Service {
+	secretId, ok := os.LookupEnv("SMS_SECRET_ID")
+	if !ok {
+		panic("找不到腾讯 SMS 的 secret id")
+	}
+	secretKey, ok := os.LookupEnv("SMS_SECRET_KEY")
+	if !ok {
+		panic("找不到腾讯 SMS 的 secret key")
+	}
+	c, err := tencentSMS.NewClient(
+		common.NewCredential(secretId, secretKey),
+		"ap-nanjing",
+		profile.NewClientProfile(),
+	)
+	if err != nil {
+		panic(err)
+	}
+	return NewService(c, "1400842696", "妙影科技")
+}
+
 func (s *Service) Send(ctx context.Context, tplId string, args []string, numbers ...string) error {
-	request := sms.NewSendSmsRequest()
+	request := tencentSMS.NewSendSmsRequest()
 	request.SmsSdkAppId = s.appId
 	request.SignName = s.signName
 	request.TemplateId = &tplId
@@ -37,7 +60,7 @@ func (s *Service) Send(ctx context.Context, tplId string, args []string, numbers
 	return nil
 }
 
-func NewService(client *sms.Client, appId string, signName string) *Service {
+func NewService(client *tencentSMS.Client, appId string, signName string) *Service {
 	return &Service{
 		client:   client,
 		appId:    &appId,

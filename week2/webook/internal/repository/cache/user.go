@@ -9,12 +9,26 @@ import (
 	"time"
 )
 
-type UserCache struct {
+var ErrKeyNotExist = redis.Nil
+
+type UserCache interface {
+	Get(ctx context.Context, uid int64) (domain.User, error)
+	Set(ctx context.Context, du domain.User) error
+}
+
+type RedisUserCache struct {
 	cmd        redis.Cmdable
 	expiration time.Duration
 }
 
-func (c *UserCache) Get(ctx context.Context, uid int64) (domain.User, error) {
+func NewUserCache(cmd redis.Cmdable) UserCache {
+	return &RedisUserCache{
+		cmd:        cmd,
+		expiration: time.Minute * 15,
+	}
+}
+
+func (c *RedisUserCache) Get(ctx context.Context, uid int64) (domain.User, error) {
 	key := c.Key(uid)
 	// 假定用JSON来存储val
 	val, err := c.cmd.Get(ctx, key).Result()
@@ -27,12 +41,12 @@ func (c *UserCache) Get(ctx context.Context, uid int64) (domain.User, error) {
 	return u, err
 }
 
-func (c *UserCache) Key(uid int64) string {
+func (c *RedisUserCache) Key(uid int64) string {
 	// 格式化字符串
 	return fmt.Sprintf("user:info:%d", uid)
 }
 
-func (c *UserCache) Set(ctx context.Context, du domain.User) error {
+func (c *RedisUserCache) Set(ctx context.Context, du domain.User) error {
 	key := c.Key(du.Id)
 	// 序列化
 	val, err := json.Marshal(du)
@@ -40,11 +54,4 @@ func (c *UserCache) Set(ctx context.Context, du domain.User) error {
 		return err
 	}
 	return c.cmd.Set(ctx, key, val, c.expiration).Err()
-}
-
-func NewUserCache(cmd redis.Cmdable) *UserCache {
-	return &UserCache{
-		cmd:        cmd,
-		expiration: time.Minute * 15,
-	}
 }

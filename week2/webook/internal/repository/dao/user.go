@@ -17,18 +17,25 @@ var (
 	ErrRecordNotFound = gorm.ErrRecordNotFound
 )
 
-type UserDao struct {
+type UserDao interface {
+	Insert(ctx context.Context, u User) error
+	FindByEmail(ctx context.Context, email string) (User, error)
+	FindByPhone(ctx context.Context, phone string) (User, error)
+	UpdateById(ctx context.Context, persistent User) error
+	FindById(ctx context.Context, id int64) (User, error)
+}
+type GORMUserDao struct {
 	db *gorm.DB
 }
 
-func NewUserDao(db *gorm.DB) *UserDao {
-	return &UserDao{
+func NewUserDao(db *gorm.DB) UserDao {
+	return &GORMUserDao{
 		db: db,
 	}
 }
 
 // Insert dao层要返回自己定义的User，而不是domain.User
-func (dao *UserDao) Insert(ctx context.Context, u User) error {
+func (dao *GORMUserDao) Insert(ctx context.Context, u User) error {
 	// 取当前毫秒数
 	now := time.Now().UnixMilli()
 	u.Ctime = now
@@ -48,13 +55,13 @@ func (dao *UserDao) Insert(ctx context.Context, u User) error {
 	return err
 }
 
-func (dao *UserDao) FindByEmail(ctx context.Context, email string) (User, error) {
+func (dao *GORMUserDao) FindByEmail(ctx context.Context, email string) (User, error) {
 	var u User
 	err := dao.db.WithContext(ctx).Where("email=?", email).First(&u).Error
 	return u, err
 }
 
-func (dao *UserDao) UpdateById(ctx context.Context, persistent User) error {
+func (dao *GORMUserDao) UpdateById(ctx context.Context, persistent User) error {
 	return dao.db.WithContext(ctx).Model(&persistent).Where("id=?", persistent.Id).Updates(map[string]any{
 		"utime":    time.Now().UnixMilli(), // 更新时间
 		"nickname": persistent.Nickname,
@@ -63,13 +70,13 @@ func (dao *UserDao) UpdateById(ctx context.Context, persistent User) error {
 	}).Error
 }
 
-func (dao *UserDao) FindById(ctx context.Context, id int64) (User, error) {
+func (dao *GORMUserDao) FindById(ctx context.Context, id int64) (User, error) {
 	var u User
 	err := dao.db.WithContext(ctx).Where("id=?", id).First(&u).Error
 	return u, err
 }
 
-func (dao *UserDao) FindByPhone(ctx context.Context, phone string) (User, error) {
+func (dao *GORMUserDao) FindByPhone(ctx context.Context, phone string) (User, error) {
 	var u User
 	err := dao.db.WithContext(ctx).Where("phone=?", phone).First(&u).Error
 	return u, err

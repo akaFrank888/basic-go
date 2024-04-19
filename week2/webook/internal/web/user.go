@@ -24,8 +24,8 @@ const (
 
 // UserHandler 定义一个专门处理有关User的路由的Handler
 type UserHandler struct {
-	svc     *service.UserService
-	codeSvc *service.CodeService
+	svc     service.UserService
+	codeSvc service.CodeService
 
 	emailRegexExp    *regexp.Regexp
 	passwordRegexExp *regexp.Regexp
@@ -34,7 +34,7 @@ type UserHandler struct {
 	resumeRegexExp   *regexp.Regexp
 }
 
-func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
+func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
 	return &UserHandler{
 		svc:     svc,
 		codeSvc: codeSvc,
