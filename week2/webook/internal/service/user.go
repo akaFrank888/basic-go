@@ -32,13 +32,13 @@ func NewUserService(repo repository.UserRepository) UserService {
 }
 
 func (svc *userService) SignUp(ctx context.Context, u domain.User) error {
-	// 对用户密码的加密设计在service层
+	// note 对用户密码的加密设计在 service 层
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 
 	if err != nil {
 		return err
 	}
-	u.Password = string(hash)
+	u.Password = string(hash) // []byte ==> string
 	return svc.repo.Create(ctx, u)
 }
 

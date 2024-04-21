@@ -48,12 +48,11 @@ func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserH
 	}
 }
 
-// RegisterRoutes 用于注册路由
 func (c *UserHandler) RegisterRoutes(server *gin.Engine) {
 
 	// 使用Group分组路由，简化注册路由中的路径长度
 	ug := server.Group("/users")
-	ug.POST("/signup", c.SignUp) // TODO 注意此处HandlerFunc类型，不需要写SignUp后的括号及参数
+	ug.POST("/signup", c.SignUp) // note 此处是HandlerFunc类型，不需要写SignUp方法后的括号及参数（不然就是调用方法了）
 	// ug.POST("/login", c.Login)
 	ug.POST("/login", c.LoginJWT)
 	ug.POST("/edit", c.Edit)
@@ -139,18 +138,17 @@ func (c *UserHandler) LoginSMS(ctx *gin.Context) {
 
 }
 
-// SignUp 定义UserHandler上的方法作为应路由的的处理逻辑
 func (c *UserHandler) SignUp(ctx *gin.Context) {
-	// 习惯：优先使用方法内部类
-	type SignUpReq struct {
+	// note 习惯：使用 方法内部类 接收body的参数
+	type Req struct {
 		Email           string `json:"email"`
 		Password        string `json:"password"`
 		ConfirmPassword string `json:"confirmPassword"`
 	}
 
-	var req SignUpReq
-	// 调用Bind方法 [1. 自动根据Content-Type进行绑定；2. 若有错误，自动返回到前端页面]
-	// TODO Bind方法中一定要传req的地址！！！！不然绑定不成功
+	var req Req
+	// 调用Bind方法来反序列化 [1. 自动根据Content-Type进行绑定；2. 若有错误，自动返回到前端页面]
+	// note Bind方法中一定要传req的地址！(源码有写)
 	if err := ctx.Bind(&req); err != nil {
 		return
 	}
@@ -184,9 +182,8 @@ func (c *UserHandler) SignUp(ctx *gin.Context) {
 		Email:    req.Email,
 		Password: req.Password,
 	})
-	// TODO 处理邮箱相同的冲突err，即需要拿到 mysql 的唯一索引冲突
-	// 不能直接 if err!=dao.ErrDuplicateEmail，因为web层里不能直接调dao层的东西，所以得一层层传
-	// 使得Handler之保持对service的依赖，避免跨层依赖
+	// note 处理邮箱相同的冲突err，即需要拿到 mysql 的唯一索引冲突
+	// note 不能直接 if err==dao.ErrDuplicateEmail，因为web层里不能直接调dao层的东西，所以得一层层传，使得Handler只保持对service的依赖，避免跨层依赖
 	switch err {
 	case nil:
 		ctx.String(http.StatusOK, "注册成功")

@@ -43,7 +43,7 @@ func (dao *GORMUserDao) Insert(ctx context.Context, u User) error {
 
 	// 获取err，检查是否是邮箱冲突
 	err := dao.db.WithContext(ctx).Create(&u).Error
-	// TODO 类型断言
+	// note 类型断言
 	if me, ok := err.(*mysql.MySQLError); ok {
 		const duplicateErr uint16 = 1062 // 从控制台看到的具体Error Number
 		if me.Number == duplicateErr {

@@ -13,6 +13,7 @@ import (
 
 func InitWebServer(mdls []gin.HandlerFunc, userHdl *web.UserHandler) *gin.Engine {
 	server := gin.Default()
+	// NOTE *gin.Engine的两大用处：注册middleware和注册路由
 	server.Use(mdls...)
 	userHdl.RegisterRoutes(server)
 	return server
@@ -20,11 +21,11 @@ func InitWebServer(mdls []gin.HandlerFunc, userHdl *web.UserHandler) *gin.Engine
 
 func InitGinMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
-		// middleware解决跨域问题【有跨域问题时才会触发】
+		// gin提供了一个middleware中间件来解决跨域问题————cors（有跨域问题时才会触发）
 		cors.New(cors.Config{
 			// 1. origin
 			//AllowAllOrigins: true,
-			AllowOrigins: []string{"https://foo.com"},
+			// AllowOrigins: []string{"https://foo.com"},
 			AllowOriginFunc: func(origin string) bool {
 				if strings.HasPrefix(origin, "http://localhost") {
 					//if strings.Contains(origin, "localhost")
@@ -43,7 +44,7 @@ func InitGinMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
 			AllowCredentials: true,
 			MaxAge:           12 * time.Hour,
 		}),
-		func(ctx *gin.Context) { // TODO 因为是 HandlerFunc 类型的不定参数，所以可以传多个
+		func(ctx *gin.Context) { // note 因为是 HandlerFunc 类型的不定参数，所以可以传多个
 			println("这是一个middleware")
 		},
 		ratelimit.NewBuilder(redisClient, time.Second, 1000).Build(),
