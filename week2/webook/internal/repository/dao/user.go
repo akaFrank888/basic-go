@@ -23,6 +23,7 @@ type UserDao interface {
 	FindByPhone(ctx context.Context, phone string) (User, error)
 	UpdateById(ctx context.Context, persistent User) error
 	FindById(ctx context.Context, id int64) (User, error)
+	FindByWechat(ctx context.Context, openId string) (User, error)
 }
 type GORMUserDao struct {
 	db *gorm.DB
@@ -82,6 +83,12 @@ func (dao *GORMUserDao) FindByPhone(ctx context.Context, phone string) (User, er
 	return u, err
 }
 
+func (dao *GORMUserDao) FindByWechat(ctx context.Context, openId string) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("wechat_open_id=?", openId).First(&u).Error
+	return u, err
+}
+
 // User 相当于PO，即属性与表字段一一对应
 type User struct {
 	Id int64 `gorm:"primaryKey,autoIncrement"`
@@ -93,6 +100,12 @@ type User struct {
 	Resume   string `gorm:"type=varchar(200)"`
 
 	Phone sql.NullString `gorm:"unique"`
+	// 索引设计的方案：
+	// 1 如果查询要求同时使用 openid 和 unionid，就要创建联合唯一索引
+	// 2 如果查询只用 openid，那么就在 openid 上创建唯一索引，或者 <openid, unionId> 联合索引
+	// 3 如果查询只用 unionid，那么就在 unionid 上创建唯一索引，或者 <unionid, openid> 联合索引
+	WechatOpenId  sql.NullString `gorm:"unique"`
+	WechatUnionId sql.NullString
 
 	// 创建时间  避免时区问题，一律用 UTC 0 的毫秒数【若要转成符合中国的时区，要么让前端处理，要么在web层给前端的时候转成UTC 8 的时区】
 	Ctime int64

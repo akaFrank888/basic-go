@@ -23,6 +23,7 @@ type UserRepository interface {
 	FindByPhone(ctx context.Context, phone string) (domain.User, error)
 	FindById(ctx context.Context, uid int64) (domain.User, error)
 	UpdateNonZeroFields(ctx context.Context, user domain.User) error
+	FindByWechat(ctx context.Context, openId string) (domain.User, error)
 }
 
 type CachedUserRepository struct {
@@ -77,7 +78,14 @@ func (repo *CachedUserRepository) FindByPhone(ctx context.Context, phone string)
 		return domain.User{}, err
 	}
 	return toDomain(u), nil
+}
 
+func (repo *CachedUserRepository) FindByWechat(ctx context.Context, openId string) (domain.User, error) {
+	u, err := repo.dao.FindByWechat(ctx, openId)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return toDomain(u), nil
 }
 
 // 私有方法（首字母小写）
@@ -93,6 +101,10 @@ func toDomain(u dao.User) domain.User {
 		Resume:   u.Resume,
 		// UTC 0的毫秒 -> time
 		Ctime: time.UnixMilli(u.Ctime),
+		WechatInfo: domain.WechatInfo{
+			OpenId:  u.WechatOpenId.String,
+			UnionId: u.WechatUnionId.String,
+		},
 	}
 }
 
@@ -111,5 +123,13 @@ func toPersistent(u domain.User) dao.User {
 		Nickname: u.Nickname,
 		Birthday: u.Birthday.UnixMilli(),
 		Resume:   u.Resume,
+		WechatOpenId: sql.NullString{
+			String: u.WechatInfo.OpenId,
+			Valid:  u.WechatInfo.OpenId != "",
+		},
+		WechatUnionId: sql.NullString{
+			String: u.WechatInfo.UnionId,
+			Valid:  u.WechatInfo.UnionId != "",
+		},
 	}
 }

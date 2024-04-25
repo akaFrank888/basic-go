@@ -6,7 +6,9 @@
 
 2） 后端
 
-3）前端启动： 在webook-fe目录下，执行`npm install`，等下载好接着执行`npm run dev`
+3） 前端启动： 在webook-fe目录下，执行`npm install`，等下载好接着执行`npm run dev`
+
+4） 若增删了模块的方法，可能要在webook目录下，执行`wire`
 
 #### 代办：
 
@@ -86,6 +88,8 @@
 学习时间： 2024/4/21 —— 2024/4/
 
 学习内容：
+1. 微信扫码登录
 
+<img src="images/week6_wxlogin_process.png">
 
 待更。。。。

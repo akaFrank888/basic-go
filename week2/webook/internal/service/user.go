@@ -20,6 +20,7 @@ type UserService interface {
 	UpdateNonSensitiveInfo(ctx context.Context, user domain.User) error
 	FindById(ctx context.Context, id int64) (domain.User, error)
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
+	FindOrCreateByWechat(ctx context.Context, info domain.WechatInfo) (domain.User, error)
 }
 type userService struct {
 	repo repository.UserRepository
@@ -91,4 +92,27 @@ func (svc *userService) FindOrCreate(ctx context.Context, phone string) (domain.
 	// 2. err == nil ==> 创建成功
 	// TODO 主从延迟 ==>插入进的是主库，查询查的是从库，所以可能刚插进去就查的话查不到，因为主从库还没同步完成【解决方式是强制查主库，但还没做】
 	return svc.repo.FindByPhone(ctx, phone)
+}
+
+func (svc *userService) FindOrCreateByWechat(ctx context.Context, info domain.WechatInfo) (domain.User, error) {
+	u, err := svc.repo.FindByWechat(ctx, info.OpenId)
+	if err != repository.ErrUserNotFound {
+		// 两种情况
+		// 1. err != nil ==> 系统错误
+		// 2. err == nil ==> u可用
+		return u, err
+	}
+	// Find失败就Create
+	err = svc.repo.Create(ctx, domain.User{
+		WechatInfo: info,
+	})
+	if err != nil && err != repository.ErrDuplicatePhone {
+		// 系统错误
+		return domain.User{}, err
+	}
+	// 两种情况
+	// 1. err == ErrDuplicatePhone ==> 手机号冲突
+	// 2. err == nil ==> 创建成功
+	// TODO 主从延迟 ==>插入进的是主库，查询查的是从库，所以可能刚插进去就查的话查不到，因为主从库还没同步完成【解决方式是强制查主库，但还没做】
+	return svc.repo.FindByWechat(ctx, info.OpenId)
 }
