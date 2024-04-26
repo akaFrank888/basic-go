@@ -92,4 +92,12 @@
 
 <img src="images/week6_wxlogin_process.png">
 
+2. 长短token的实现
+3. viper:配置模块
+4. 日志模块
+
+学习进度：
+1. 微信登录所需要的APP_ID和APP_SECRET暂无申请到，可以考虑用别的 Oauth2 的，比如说支付宝，github，google，基本思路都一样，就是调用的 API 不同【待用其他平台的oauth2重构】
+2. 
+
 待更。。。。

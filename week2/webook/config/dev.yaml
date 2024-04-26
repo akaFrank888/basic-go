@@ -1,0 +1,8 @@
+test:
+  key: value1
+
+db:
+  dsn: "root:123456@tcp(localhost:13316)/webook"
+
+redis:
+  addr: "localhost:6379"
